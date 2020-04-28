@@ -51,6 +51,8 @@ class findFaceGetPulse(object):
         self.idx = 1
         self.find_faces = True
 
+        self.region_idx = 0
+
     def find_faces_toggle(self):
         self.find_faces = not self.find_faces
         return self.find_faces
@@ -76,6 +78,21 @@ class findFaceGetPulse(object):
                 int(y + h * fh_y - (h * fh_h / 2.0)),
                 int(w * fh_w),
                 int(h * fh_h)]
+    
+    def get_roi_coord(self):
+        print(self.region_idx)
+        # Forehead
+        map = {
+            0 : (0.5, 0.18, 0.25, 0.15),
+            1 : (0.25, 0.5, 0.25, 0.15),
+            2 : (0.75, 0.5, 0.25, 0.15)
+            }
+        print(type(self.region_idx))
+        print(map[self.region_idx])
+        print(map)
+        x,y,w,h = map[self.region_idx];#.get(self.region_idx, {0.5, 0.18, 0.25, 0.15})
+        print(x,y,w,h)
+        return self.get_subface_coord(x,y,w,h)
 
     def get_subface_means(self, coord):
         x, y, w, h = coord
@@ -122,15 +139,16 @@ class findFaceGetPulse(object):
                                                   cv2.COLOR_BGR2GRAY))
         col = (100, 255, 100)
         if self.find_faces:
-            cv2.putText(
-                self.frame_out, "Press 'C' to change camera (current: %s)" % str(
-                    cam),
-                (10, 25), cv2.FONT_HERSHEY_PLAIN, 1.25, col)
-            cv2.putText(
-                self.frame_out, "Press 'S' to lock face and begin",
-                       (10, 50), cv2.FONT_HERSHEY_PLAIN, 1.25, col)
-            cv2.putText(self.frame_out, "Press 'Esc' to quit",
-                       (10, 75), cv2.FONT_HERSHEY_PLAIN, 1.25, col)
+            if False:
+                cv2.putText(
+                    self.frame_out, "Press 'C' to change camera (current: %s)" % str(
+                        cam),
+                    (10, 25), cv2.FONT_HERSHEY_PLAIN, 1.25, col)
+                cv2.putText(
+                    self.frame_out, "Press 'S' to lock face and begin",
+                        (10, 50), cv2.FONT_HERSHEY_PLAIN, 1.25, col)
+                cv2.putText(self.frame_out, "Press 'Esc' to quit",
+                        (10, 75), cv2.FONT_HERSHEY_PLAIN, 1.25, col)
             self.data_buffer, self.times, self.trained = [], [], False
             detected = list(self.face_cascade.detectMultiScale(self.gray,
                                                                scaleFactor=1.3,
@@ -144,7 +162,7 @@ class findFaceGetPulse(object):
 
                 if self.shift(detected[-1]) > 10:
                     self.face_rect = detected[-1]
-            forehead1 = self.get_subface_coord(0.5, 0.18, 0.25, 0.15)
+            forehead1 = self.get_roi_coord()
             self.draw_rect(self.face_rect, col=(255, 0, 0))
             x, y, w, h = self.face_rect
             cv2.putText(self.frame_out, "Face",
@@ -156,19 +174,21 @@ class findFaceGetPulse(object):
             return
         if set(self.face_rect) == set([1, 1, 2, 2]):
             return
-        cv2.putText(
-            self.frame_out, "Press 'C' to change camera (current: %s)" % str(
-                cam),
-            (10, 25), cv2.FONT_HERSHEY_PLAIN, 1.25, col)
-        cv2.putText(
-            self.frame_out, "Press 'S' to restart",
-                   (10, 50), cv2.FONT_HERSHEY_PLAIN, 1.5, col)
-        cv2.putText(self.frame_out, "Press 'D' to toggle data plot",
-                   (10, 75), cv2.FONT_HERSHEY_PLAIN, 1.5, col)
-        cv2.putText(self.frame_out, "Press 'Esc' to quit",
-                   (10, 100), cv2.FONT_HERSHEY_PLAIN, 1.5, col)
 
-        forehead1 = self.get_subface_coord(0.5, 0.18, 0.25, 0.15)
+        if False:
+            cv2.putText(
+                self.frame_out, "Press 'C' to change camera (current: %s)" % str(
+                    cam),
+                (10, 25), cv2.FONT_HERSHEY_PLAIN, 1.25, col)
+            cv2.putText(
+                self.frame_out, "Press 'S' to restart",
+                    (10, 50), cv2.FONT_HERSHEY_PLAIN, 1.5, col)
+            cv2.putText(self.frame_out, "Press 'D' to toggle data plot",
+                    (10, 75), cv2.FONT_HERSHEY_PLAIN, 1.5, col)
+            cv2.putText(self.frame_out, "Press 'Esc' to quit",
+                    (10, 100), cv2.FONT_HERSHEY_PLAIN, 1.5, col)
+
+        forehead1 = self.get_roi_coord()
         self.draw_rect(forehead1)
 
         vals = self.get_subface_means(forehead1)
@@ -197,6 +217,7 @@ class findFaceGetPulse(object):
 
             freqs = 60. * self.freqs
             idx = np.where((freqs > 50) & (freqs < 180))
+            print(idx)
 
             pruned = self.fft[idx]
             phase = phase[idx]
@@ -204,6 +225,9 @@ class findFaceGetPulse(object):
             pfreq = freqs[idx]
             self.freqs = pfreq
             self.fft = pruned
+            print(pruned.shape)
+            if pruned.shape[0] == 0 :
+                return
             idx2 = np.argmax(pruned)
 
             t = (np.sin(phase[idx2]) + 1.) / 2.
@@ -214,7 +238,7 @@ class findFaceGetPulse(object):
             self.bpm = self.freqs[idx2]
             self.idx += 1
 
-            x, y, w, h = self.get_subface_coord(0.5, 0.18, 0.25, 0.15)
+            x, y, w, h = self.get_roi_coord()
             r = alpha * self.frame_in[y:y + h, x:x + w, 0]
             g = alpha * \
                 self.frame_in[y:y + h, x:x + w, 1] + \
